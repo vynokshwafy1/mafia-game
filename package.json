@@ -1,0 +1,12 @@
+{
+  "name": "the-mafias-bellweather",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Mafias: Midnight in Bellweather",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
