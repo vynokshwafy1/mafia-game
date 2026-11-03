@@ -1,6 +1,6 @@
 # The Mafias: Midnight in Bellweather
 
-A browser Mafia game with private online rooms, username/password accounts, player profiles, a coin wallet, AI seats, AI God, daily randomized challenges, Council chat, secret ballots, night actions, and a WebGL 3D town scene.
+A browser Mafia game where AI God runs both local pass-and-play and online rooms. Players answer privately on a shared device in local mode; AI God scores challenges, deals shuffled Mystery cards, keeps Council time, counts secret ballots, and resolves nights. Includes AI seats, profiles, coins, daily randomized challenges, Council chat, sound effects, and a WebGL 3D town scene.
 
 ## Play online
 [Play The Mafias: Midnight in Bellweather](https://mafia-game-ij59.onrender.com/). No download or local server is required.
