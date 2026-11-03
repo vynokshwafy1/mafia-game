@@ -163,14 +163,7 @@
     ['Final Brain Quiz','What gas do humans need to breathe?','Oxygen',['Oxygen','Helium','Carbon dioxide','Hydrogen']],
     ['School Fun: Categories','Name an animal beginning with M.','Any animal beginning with M',['Monkey','Moose','Mongoose','Any other M animal']]
   ];
-  window.challenge=function(c){
-    if(!G.dailyChallenge)G.dailyChallenge=localChallengeBank[Math.random()*localChallengeBank.length|0];
-    const d=G.dailyChallenge;
-    c.innerHTML='<div class="eyebrow">Day '+G.day+' · AI God’s random daily challenge</div><h2>'+h(d[0])+'</h2><p class="sub">A fresh prompt is drawn each day. The host checks answers and records the winner.</p><div class="qcard"><p>'+h(d[1])+'</p></div><div class="grid">'+d[3].map(a=>'<div class="choice">'+h(a)+'</div>').join('')+'</div><button id="answerKey" class="btn">Reveal host answer</button><div id="answerReveal" class="notice hidden">Answer: '+h(d[2])+'</div>'+(G.challengeDone?'<div class="notice">'+h(G.challengeWinner||'A player')+' won the challenge.</div>':'')+'<div class="actions"><button id="reset" class="btn">Reset game</button><button id="next" class="btn primary">'+(G.challengeDone?'Continue to Mystery Box →':'Record winner →')+'</button></div>';
-    $('#answerKey').onclick=()=>$('#answerReveal').classList.toggle('hidden');
-    $('#next').onclick=()=>G.challengeDone?(G.phase='box',render()):pickWinner();
-    $('#reset').onclick=reset;
-  };
+  window.challenge=function(c){const d=G.localChallenge||(G.localChallenge=LOCAL_CHALLENGES[Math.random()*LOCAL_CHALLENGES.length|0]);c.innerHTML='<div class="eyebrow">Day '+G.day+' · AI God’s random daily challenge</div><h2>'+h(d.type)+'</h2><p class="sub">'+h(d.q)+'</p><div class="notice">Players answer privately, then AI God scores every answer and selects the winner.</div><div class="tiny">A new challenge is selected randomly each day.</div><div class="actions"><button id="reset" class="btn">Reset game</button><button id="answerChallenge" class="btn primary">Start private answers →</button></div>';$('#answerChallenge').onclick=()=>collectLocalAnswers(0);$('#reset').onclick=reset;};
   const oldResolveNight=resolveNight;
   window.resolveNight=function(){const before=G.day;oldResolveNight();if(G.day!==before){G.dailyChallenge=null;render()}};
   const previousStart=render;
