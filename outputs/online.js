@@ -12,6 +12,9 @@
   let online = null;
   let roomState = null;
   let refreshTimer = null;
+  let pendingRequests = 0;
+  let queueTimer = null;
+  let requestStartedAt = 0;
   const $ = s => document.querySelector(s);
   const h = s => String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const escAttr = h;
@@ -22,17 +25,31 @@
   const style=document.createElement('style');
   style.textContent='.profile-card,.online-card,.online-stage,.online-option{background:#171b23;border:1px solid #353a43;padding:16px;margin:12px 0}.profile-heading,.profile-options,.profile-preview,.online-profile,.online-member,.online-room-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.profile-options{align-items:flex-start;margin:14px 0}.avatar-list,.swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.avatar{min-width:38px;padding:8px}.avatar strong{font-size:20px}.swatch{width:22px;height:22px;border:2px solid #666;border-radius:50%;cursor:pointer}.swatch.selected,.avatar.selected{outline:2px solid var(--gold)}.profile-preview{justify-content:flex-start;border-top:1px solid #343942;padding-top:12px}.profile-preview b,.online-profile b{display:block}.profile-preview small,.online-profile small{display:block;color:#999da5;font-size:10px;margin-top:3px}.portrait{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:19px;flex:none}.online-start{display:grid;grid-template-columns:1fr 1fr;gap:10px}.online-option{margin:0}.online-room-top{margin:12px 0;flex-wrap:wrap}.room-badge{padding:10px 14px;border:1px solid #353a43;background:#10141b;flex:1;min-width:90px}.room-badge .tiny,.room-badge b{display:block}.room-badge b{font:20px \"Playfair Display\",serif;color:#ecd9ae;margin-top:5px}.online-stage{padding:18px}.online-stage .notice{margin:9px 0}.online-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}.online-card{margin:0}.online-members{margin-top:10px}.online-member{padding:8px 0;border-bottom:1px solid #303640}.online-member:last-child{border:0}.online-profile{justify-content:flex-start}.online-profile i{font:8px \"DM Mono\",monospace;color:var(--gold);font-style:normal}.online-events{max-height:190px;overflow:auto}.chatbox{border:1px solid #343a43;background:#10141b;padding:12px;margin-top:12px}.chat-log{height:210px;overflow:auto;margin:8px 0}.chat-message{display:flex;gap:8px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid #2c3139;font-size:11px}.chat-message b{color:#e5dfd2}.chat-message small{display:block;color:#b0b3b9;line-height:1.45;margin-top:3px;overflow-wrap:anywhere}.coinmark{color:var(--gold);letter-spacing:.04em}.codefield{font:15px \"DM Mono\",monospace;letter-spacing:.2em;text-align:center}.toggle{display:block;color:#b6b8be;font-size:12px;margin:12px 0}.toggle input{accent-color:var(--gold);margin-right:7px}@media(max-width:650px){.online-start,.online-columns{grid-template-columns:1fr}.profile-options{display:block}.profile-options>div{margin:10px 0}}';
   document.head.appendChild(style);
+  const queueStyle=document.createElement('style');queueStyle.textContent='#requestQueue{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:20px;background:rgba(8,10,14,.86);backdrop-filter:blur(6px)}#requestQueue.hidden{display:none!important}.request-card{width:min(440px,100%);padding:28px;background:#171b23;border:1px solid #796345;box-shadow:0 24px 80px #000a;text-align:center}.request-spinner{width:38px;height:38px;margin:0 auto 18px;border:2px solid #49433a;border-top-color:var(--gold);border-radius:50%;animation:requestSpin .8s linear infinite}@keyframes requestSpin{to{transform:rotate(360deg)}}.request-card h2{margin:0 0 10px}.request-card p{color:#b4b6bd;font-size:13px;line-height:1.6}.request-time{font:10px monospace;letter-spacing:.12em;color:#d9bd82;text-transform:uppercase}';document.head.appendChild(queueStyle);
+  function showRequestQueue(){
+    if(pendingRequests++>0)return;
+    requestStartedAt=Date.now();
+    let overlay=document.getElementById('requestQueue');
+    if(!overlay){overlay=document.createElement('div');overlay.id='requestQueue';overlay.className='hidden';overlay.setAttribute('role','status');overlay.setAttribute('aria-live','polite');overlay.innerHTML='<div class="request-card"><div class="request-spinner" aria-hidden="true"></div><span class="eyebrow">BELLWEATHER CONNECTION</span><h2 id="requestTitle">Your request is waiting</h2><p id="requestCopy">Connecting to the game server. Keep this page open while we wait.</p><div class="request-time" id="requestTime">WAITING 0 SECONDS</div></div>';document.body.appendChild(overlay)}
+    overlay.classList.remove('hidden');
+    const update=()=>{const seconds=Math.floor((Date.now()-requestStartedAt)/1000),title=document.getElementById('requestTitle'),copy=document.getElementById('requestCopy'),time=document.getElementById('requestTime');if(time)time.textContent='WAITING '+seconds+' SECOND'+(seconds===1?'':'S');if(seconds>=8&&title){title.textContent='The server is waking up';copy.textContent='Your request is still waiting. The free server may have been asleep; please keep this page open.'}};
+    update();queueTimer=setInterval(update,1000);
+  }
+  function hideRequestQueue(){pendingRequests=Math.max(0,pendingRequests-1);if(pendingRequests)return;if(queueTimer){clearInterval(queueTimer);queueTimer=null}const overlay=document.getElementById('requestQueue');if(overlay)overlay.classList.add('hidden')}
   function saveProfile() { localStorage.setItem(profileKey, JSON.stringify(me)); }
-  async function api(path, body) {
+  async function api(path, body, options={}) {
     if (location.protocol === 'file:') throw new Error('Online rooms need the web server. Start it with npm start, then open localhost:3000.');
-    const opts = { headers: {'content-type':'application/json'} };
-    if(authToken)opts.headers['x-auth-token']=authToken;
-    if(online&&online.token)opts.headers['x-room-token']=online.token;
-    if (body !== undefined) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
-    const response = await fetch('/api' + path, opts);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'The server could not complete that action.');
-    return data;
+    const showQueue=!options.quiet;if(showQueue)showRequestQueue();
+    try {
+      const opts = { headers: {'content-type':'application/json'} };
+      if(authToken)opts.headers['x-auth-token']=authToken;
+      if(online&&online.token)opts.headers['x-room-token']=online.token;
+      if (body !== undefined) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+      const response = await fetch('/api' + path, opts);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'The server could not complete that action.');
+      return data;
+    } finally { if(showQueue)hideRequestQueue(); }
   }
   function message(text) { let box=$('#onlineError'); if(box){box.textContent=text;box.classList.remove('hidden')} else alert(text); }
   function profileForm() {
@@ -87,7 +104,7 @@
   async function enterRoom() { try { if(authToken&&!account)account=await api('/auth/profile');await poll();if(!refreshTimer)refreshTimer=setInterval(poll,1700);onlineDraw(); }catch(e){message(e.message)} }
   async function poll() {
     if(!online)return;
-    try {const ids=['chatText','targetSelect','extraTarget','nightTarget','hintQuestion'];const drafts={};let focusId=null;ids.forEach(id=>{const x=$('#'+id);if(x){drafts[id]=x.value;if(document.activeElement===x)focusId=id}});roomState=await api('/'+encodeURIComponent(online.code)+'?token='+encodeURIComponent(online.token));if(roomState.self&&account)account.coins=roomState.self.coins;if(G.onlineMode){onlineDraw();ids.forEach(id=>{const x=$('#'+id);if(x&&drafts[id]!==undefined)x.value=drafts[id]});if(focusId&&$('#'+focusId))$('#'+focusId).focus()} }
+    try {const ids=['chatText','targetSelect','extraTarget','nightTarget','hintQuestion'];const drafts={};let focusId=null;ids.forEach(id=>{const x=$('#'+id);if(x){drafts[id]=x.value;if(document.activeElement===x)focusId=id}});roomState=await api('/'+encodeURIComponent(online.code)+'?token='+encodeURIComponent(online.token),undefined,{quiet:true});if(roomState.self&&account)account.coins=roomState.self.coins;if(G.onlineMode){onlineDraw();ids.forEach(id=>{const x=$('#'+id);if(x&&drafts[id]!==undefined)x.value=drafts[id]});if(focusId&&$('#'+focusId))$('#'+focusId).focus()} }
     catch(e){if(e.message==='Room not found'){clearRoom();if(G.onlineMode)onlineDraw()}else console.warn(e.message)}
   }
   async function post(action, body={}) {
